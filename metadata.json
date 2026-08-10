@@ -1,0 +1,6 @@
+{
+  "name": "Level Devil",
+  "description": "A troll 2D platformer game with sudden traps, disappearing platforms, sprouting spikes, and moving doors!",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

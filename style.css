@@ -1,8 +1,0 @@
-*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#111;font-family:system-ui,sans-serif;touch-action:none}body{display:flex;justify-content:center;align-items:center}.hidden{display:none!important}
-#gameWrap{position:relative;width:min(100vw,1100px);height:min(100vh,650px);overflow:hidden;background:#78c8ff;border-radius:14px;box-shadow:0 12px 40px #0008}canvas{width:100%;height:100%;display:block}
-#hud{position:absolute;top:12px;left:12px;right:12px;display:flex;justify-content:space-between;color:white;font-weight:800;font-size:18px;text-shadow:0 2px 3px #000;background:#0004;padding:8px 12px;border-radius:12px;pointer-events:none}
-#menu,#message{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:white;background:#0008;padding:20px}#menu h1{font-size:clamp(32px,7vw,64px);margin:0 0 8px;text-shadow:0 5px 0 #000}#menu p{font-size:20px;margin:0 0 22px}#menu small{margin-top:14px}
-button{border:0;border-radius:14px;background:#fff;color:#111;font-weight:900;cursor:pointer;box-shadow:0 5px 0 #999}#startBtn{padding:15px 28px;font-size:18px;background:#ffd43b;box-shadow:0 5px 0 #b88e00}
-#message h2{font-size:42px;margin:0 0 12px}.msgBtns{display:flex;gap:12px}#message button{padding:12px 18px}
-#controls{position:absolute;left:0;right:0;bottom:12px;display:flex;justify-content:space-between;padding:0 18px;pointer-events:none}#controls button{pointer-events:auto;width:62px;height:62px;font-size:25px;background:#ffffffaa;backdrop-filter:blur(4px)}#jump{margin-left:auto;margin-right:10px}#left{margin-right:auto}
-@media(min-width:700px){#controls{opacity:.55}}
