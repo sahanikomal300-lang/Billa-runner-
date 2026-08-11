@@ -14,13 +14,16 @@ import androidx.compose.ui.input.key.type
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.game.data.LevelData
+import com.example.game.model.Checkpoint
 import com.example.game.model.Door
 import com.example.game.model.Level
+import com.example.game.model.LevelKey
 import com.example.game.model.Particle
 import com.example.game.model.Platform
 import com.example.game.model.Player
 import com.example.game.model.Spike
 import com.example.game.model.TrapType
+import com.example.game.model.TriggerZone
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -29,6 +32,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.hypot
+import kotlin.math.sin
 import kotlin.random.Random
 
 enum class GameScreenState {
@@ -53,6 +57,8 @@ data class GameUiState(
     val player: Player = Player(x = 50f, y = 220f),
     val platforms: List<Platform> = emptyList(),
     val spikes: List<Spike> = emptyList(),
+    val keys: List<LevelKey> = emptyList(),
+    val checkpoints: List<Checkpoint> = emptyList(),
     val door: Door = Door(x = 730f, y = 212f),
     val particles: List<Particle> = emptyList(),
     val cameraX: Float = 0f,
@@ -60,7 +66,11 @@ data class GameUiState(
     val isLevelWon: Boolean = false,
     val totalDeaths: Int = 0,
     val isControlsInverted: Boolean = false,
+    val isReverseGravity: Boolean = false,
     val tauntMessage: String = "",
+    val bannerText: String = "",
+    val bannerColor: Color = Color.Yellow,
+    val bannerAlpha: Float = 0f,
     val levelProgressMap: Map<Int, LevelProgress> = emptyMap(),
     val isSoundEnabled: Boolean = true
 )
@@ -76,14 +86,20 @@ class GameViewModel : ViewModel() {
     private var jumpInput = false
 
     // Tuning Constants for Smooth Pixel-Art Platforming
-    private val moveSpeed = 5.2f
+    private var moveSpeed = 5.0f
     private val accel = 0.22f
-    private val jumpPower = -11.5f
-    private val gravity = 0.52f
+    private var jumpPower = -15.5f
+    private var gravity = 0.45f
 
     // Coyote & Jump Buffer
     private var coyoteTimer = 0
     private var jumpBufferTimer = 0
+
+    // Active Checkpoint position
+    private var activeCheckpointPos: Pair<Float, Float>? = null
+
+    // Banner Timer
+    private var bannerTicks = 0
 
     init {
         val initialProgress = LevelData.levels.associate {
@@ -104,14 +120,28 @@ class GameViewModel : ViewModel() {
 
         val platformsCopy = level.platforms.map { it.copy() }
         val spikesCopy = level.spikes.map { it.copy() }
-        val doorCopy = level.door.copy()
-        val playerStart = Player(x = level.playerStart.first, y = level.playerStart.second)
+        val keysCopy = level.keys.map { it.copy() }
+        val checkpointsCopy = level.checkpoints.map { it.copy() }
+        val doorCopy = level.door.copy(isLocked = level.keys.isNotEmpty())
+        val playerStart = Player(
+            x = level.playerStart.first,
+            y = level.playerStart.second,
+            width = 24f,
+            height = 28f,
+            targetWidth = 24f,
+            targetHeight = 28f
+        )
 
         leftInput = false
         rightInput = false
         jumpInput = false
         coyoteTimer = 0
         jumpBufferTimer = 0
+        activeCheckpointPos = null
+
+        // Reset gravity & physics
+        gravity = 0.45f
+        jumpPower = -15.5f
 
         _uiState.update {
             it.copy(
@@ -120,13 +150,18 @@ class GameViewModel : ViewModel() {
                 player = playerStart,
                 platforms = platformsCopy,
                 spikes = spikesCopy,
+                keys = keysCopy,
+                checkpoints = checkpointsCopy,
                 door = doorCopy,
                 particles = emptyList(),
                 cameraX = 0f,
                 isDead = false,
                 isLevelWon = false,
                 isControlsInverted = false,
-                tauntMessage = ""
+                isReverseGravity = false,
+                tauntMessage = "",
+                bannerText = "",
+                bannerAlpha = 0f
             )
         }
     }
@@ -138,6 +173,13 @@ class GameViewModel : ViewModel() {
     fun nextLevel() {
         val nextIdx = _uiState.value.currentLevelIndex + 1
         loadLevel(nextIdx)
+    }
+
+    fun showBanner(text: String, color: Color = Color(0xFFFFA502)) {
+        bannerTicks = 90 // ~1.5 sec
+        _uiState.update {
+            it.copy(bannerText = text, bannerColor = color, bannerAlpha = 1f)
+        }
     }
 
     // Touch Controls
@@ -155,7 +197,7 @@ class GameViewModel : ViewModel() {
             jumpBufferTimer = 6
             if (_uiState.value.isDead || _uiState.value.isLevelWon) {
                 if (_uiState.value.isLevelWon) nextLevel()
-                else restartCurrentLevel()
+                else respawnOrRestart()
             }
         }
     }
@@ -182,7 +224,7 @@ class GameViewModel : ViewModel() {
                     jumpBufferTimer = 6
                     if (_uiState.value.isDead || _uiState.value.isLevelWon) {
                         if (_uiState.value.isLevelWon) nextLevel()
-                        else restartCurrentLevel()
+                        else respawnOrRestart()
                     }
                 }
                 return true
@@ -193,6 +235,41 @@ class GameViewModel : ViewModel() {
             }
         }
         return false
+    }
+
+    private fun respawnOrRestart() {
+        val state = _uiState.value
+        val checkpoint = activeCheckpointPos
+        if (checkpoint != null) {
+            // Respawn at checkpoint!
+            val respawnPlayer = state.player.copy(
+                x = checkpoint.first,
+                y = checkpoint.second - state.player.height,
+                vx = 0f,
+                vy = 0f,
+                isGrounded = false
+            )
+
+            // Reset platforms & door state safely
+            val platformsCopy = state.currentLevel.platforms.map { it.copy() }
+            val spikesCopy = state.currentLevel.spikes.map { it.copy() }
+            val doorCopy = state.currentLevel.door.copy()
+
+            _uiState.update {
+                it.copy(
+                    player = respawnPlayer,
+                    platforms = platformsCopy,
+                    spikes = spikesCopy,
+                    door = doorCopy,
+                    particles = emptyList(),
+                    isDead = false,
+                    isLevelWon = false,
+                    tauntMessage = ""
+                )
+            }
+        } else {
+            restartCurrentLevel()
+        }
     }
 
     private fun startGameLoop() {
@@ -208,6 +285,14 @@ class GameViewModel : ViewModel() {
 
     private fun tickPhysics() {
         val state = _uiState.value
+
+        // Update Banner Text alpha decay
+        if (bannerTicks > 0) {
+            bannerTicks--
+            val newAlpha = (bannerTicks / 90f).coerceIn(0f, 1f)
+            _uiState.update { it.copy(bannerAlpha = newAlpha) }
+        }
+
         if (state.isDead) {
             updateParticles()
             return
@@ -216,9 +301,21 @@ class GameViewModel : ViewModel() {
 
         val player = state.player.copy()
         var inverted = state.isControlsInverted
+        var isReverseGravity = state.isReverseGravity
         val platforms = state.platforms.map { it.copy() }
         val spikes = state.spikes.map { it.copy() }
+        val keys = state.keys.map { it.copy() }
+        val checkpoints = state.checkpoints.map { it.copy() }
+        val triggerZones = state.currentLevel.triggerZones
         val door = state.door.copy()
+
+        // 1. Smoothly interpolate player size
+        player.width += (player.targetWidth - player.width) * 0.15f
+        player.height += (player.targetHeight - player.height) * 0.15f
+
+        // 2. Adjust gravity direction & magnitude
+        val curGravity = if (isReverseGravity) -gravity else gravity
+        val curJumpPower = if (isReverseGravity) -jumpPower else jumpPower
 
         // Horizontal input
         val moveLeft = if (inverted) rightInput else leftInput
@@ -249,16 +346,84 @@ class GameViewModel : ViewModel() {
 
         // Jump Execution
         if (jumpBufferTimer > 0 && coyoteTimer > 0) {
-            player.vy = jumpPower
+            player.vy = curJumpPower
             player.isGrounded = false
             coyoteTimer = 0
             jumpBufferTimer = 0
+            if (state.isSoundEnabled) GameAudio.playJumpSound()
         }
 
         // Apply Gravity
-        player.vy += gravity
+        player.vy += curGravity
 
-        // Horizontal Movement & Collisions
+        // --- UPDATE MOVING PLATFORMS ---
+        platforms.forEach { platform ->
+            if (platform.trapType == TrapType.MOVING_PLATFORM && platform.isVisible) {
+                val dx = platform.endX - platform.startX
+                val dy = platform.endY - platform.startY
+                val dist = hypot(dx.toDouble(), dy.toDouble()).toFloat()
+
+                if (dist > 0f) {
+                    platform.moveProgress += (platform.moveSpeed / dist) * platform.moveDirection
+                    if (platform.moveProgress >= 1f) {
+                        platform.moveProgress = 1f
+                        platform.moveDirection = -1
+                    } else if (platform.moveProgress <= 0f) {
+                        platform.moveProgress = 0f
+                        platform.moveDirection = 1
+                    }
+
+                    val oldX = platform.x
+                    val oldY = platform.y
+                    platform.x = platform.startX + dx * platform.moveProgress
+                    platform.y = platform.startY + dy * platform.moveProgress
+
+                    // Move standing player with platform
+                    if (player.isGrounded && player.bounds.overlaps(platform.bounds)) {
+                        player.x += (platform.x - oldX)
+                        player.y += (platform.y - oldY)
+                    }
+                }
+            }
+        }
+
+        // --- TRIGGER ZONES CHECK ---
+        triggerZones.forEach { zone ->
+            if (player.bounds.overlaps(zone.bounds)) {
+                when (zone.trapType) {
+                    TrapType.SIZE_GIANT -> {
+                        player.targetWidth = 44f
+                        player.targetHeight = 52f
+                        showBanner("🔥 GIANT MODE!", Color(0xFFFF4757))
+                    }
+                    TrapType.SIZE_TINY -> {
+                        player.targetWidth = 12f
+                        player.targetHeight = 14f
+                        showBanner("🔬 TINY MODE!", Color(0xFF00D2D3))
+                    }
+                    TrapType.SIZE_NORMAL -> {
+                        player.targetWidth = 24f
+                        player.targetHeight = 28f
+                        showBanner("⚡ NORMAL SIZE", Color(0xFF2ED573))
+                    }
+                    TrapType.GRAVITY_REVERSE -> {
+                        isReverseGravity = true
+                        showBanner("🌌 GRAVITY REVERSED!", Color(0xFF9C27B0))
+                    }
+                    TrapType.GRAVITY_NORMAL -> {
+                        isReverseGravity = false
+                        showBanner("⬇️ GRAVITY NORMAL", Color(0xFF2ED573))
+                    }
+                    TrapType.INVERT_CONTROLS -> {
+                        inverted = true
+                        showBanner("⚠️ CONTROLS FLIPPED!", Color(0xFFFF4757))
+                    }
+                    else -> {}
+                }
+            }
+        }
+
+        // --- HORIZONTAL MOVEMENT & COLLISIONS ---
         player.x += player.vx
         if (player.x < 0f) player.x = 0f
 
@@ -275,12 +440,18 @@ class GameViewModel : ViewModel() {
             }
 
             if (platform.isVisible && player.bounds.overlaps(platform.bounds)) {
-                if (player.vx > 0) player.x = platform.x - player.width
-                else if (player.vx < 0) player.x = platform.x + platform.width
+                // Breakable wall check when GIANT
+                if (platform.isBreakable && player.isGiant) {
+                    platform.isVisible = false
+                    showBanner("💥 WALL SHATTERED!", Color(0xFFFF4757))
+                } else {
+                    if (player.vx > 0) player.x = platform.x - player.width
+                    else if (player.vx < 0) player.x = platform.x + platform.width
+                }
             }
         }
 
-        // Vertical Movement & Collisions
+        // --- VERTICAL MOVEMENT & COLLISIONS ---
         player.y += player.vy
         player.isGrounded = false
 
@@ -300,34 +471,90 @@ class GameViewModel : ViewModel() {
                 }
             }
 
+            // Sinking Floor Trap
+            if (platform.trapType == TrapType.SINKING_FLOOR && platform.isTriggered) {
+                platform.y += 2.5f
+            }
+
             if (platform.isVisible && player.bounds.overlaps(platform.bounds)) {
-                if (player.vy > 0) { // Landing
-                    player.y = platform.y - player.height
-                    player.vy = 0f
-                    player.isGrounded = true
+                if (!isReverseGravity) { // Normal Gravity
+                    if (player.vy > 0) { // Landing on top
+                        player.y = platform.y - player.height
+                        player.vy = 0f
+                        player.isGrounded = true
 
-                    if (platform.trapType == TrapType.INVERT_CONTROLS) {
-                        inverted = true
-                    }
+                        if (platform.trapType == TrapType.INVERT_CONTROLS) {
+                            inverted = true
+                        }
 
-                    if (platform.trapType == TrapType.DISAPPEAR_ON_TOUCH && !platform.isTriggered) {
-                        platform.isTriggered = true
-                        viewModelScope.launch {
-                            delay(160)
-                            platform.isVisible = false
-                            _uiState.update { curr ->
-                                curr.copy(platforms = curr.platforms.map { if (it.id == platform.id) it.copy(isVisible = false) else it })
+                        if (platform.trapType == TrapType.SINKING_FLOOR) {
+                            platform.isTriggered = true
+                        }
+
+                        if (platform.trapType == TrapType.DISAPPEAR_ON_TOUCH && !platform.isTriggered) {
+                            platform.isTriggered = true
+                            viewModelScope.launch {
+                                delay(160)
+                                platform.isVisible = false
+                                _uiState.update { curr ->
+                                    curr.copy(platforms = curr.platforms.map { if (it.id == platform.id) it.copy(isVisible = false) else it })
+                                }
                             }
                         }
+                    } else if (player.vy < 0) { // Hitting ceiling from below
+                        player.y = platform.y + platform.height
+                        player.vy = 0f
                     }
-                } else if (player.vy < 0) { // Ceiling hit
-                    player.y = platform.y + platform.height
-                    player.vy = 0f
+                } else { // Reverse Gravity (walking on undersides of platforms / ceiling)
+                    if (player.vy < 0) { // Falling upward onto platform bottom
+                        player.y = platform.y + platform.height
+                        player.vy = 0f
+                        player.isGrounded = true
+                    } else if (player.vy > 0) { // Hitting floor from above
+                        player.y = platform.y - player.height
+                        player.vy = 0f
+                    }
                 }
             }
         }
 
-        // Spikes
+        // --- KEYS OVERLAP & FLEEING LOGIC ---
+        keys.forEach { key ->
+            if (!key.isCollected) {
+                if (key.isMovingKey && !key.hasMoved) {
+                    val distToKey = hypot((player.x - key.x).toDouble(), (player.y - key.y).toDouble()).toFloat()
+                    if (distToKey < key.triggerDistance) {
+                        key.x = key.targetX
+                        key.hasMoved = true
+                        showBanner("💨 KEY FLEEING!", Color(0xFFFF4757))
+                    }
+                }
+
+                if (player.bounds.overlaps(key.bounds)) {
+                    key.isCollected = true
+                    val remainingKeys = keys.count { !it.isCollected && it.id != key.id }
+                    if (remainingKeys == 0) {
+                        door.isLocked = false
+                        showBanner("🔑 KEY COLLECTED! DOOR UNLOCKED!", Color(0xFFFFD700))
+                    } else {
+                        showBanner("🔑 KEY COLLECTED! ($remainingKeys REMAINING)", Color(0xFFFFD700))
+                    }
+                    if (state.isSoundEnabled) GameAudio.playKeyCollectSound()
+                }
+            }
+        }
+
+        // --- CHECKPOINT OVERLAP ---
+        checkpoints.forEach { chk ->
+            if (!chk.isActivated && player.bounds.overlaps(chk.bounds)) {
+                chk.isActivated = true
+                activeCheckpointPos = Pair(chk.x, chk.y)
+                showBanner("🚩 CHECKPOINT!", Color(0xFF2ED573))
+                if (state.isSoundEnabled) GameAudio.playCheckpointSound()
+            }
+        }
+
+        // --- SPIKES OVERLAP ---
         spikes.forEach { spike ->
             if (spike.isHiddenSpike) {
                 val playerCenterX = player.x + player.width / 2f
@@ -343,7 +570,7 @@ class GameViewModel : ViewModel() {
             }
         }
 
-        // Door Trap
+        // --- DOOR TRAP & GOAL ---
         if (door.isMovingDoor && !door.hasMoved) {
             val distToDoor = hypot((player.x - door.x).toDouble(), (player.y - door.y).toDouble())
             if (distToDoor < door.triggerDistance) {
@@ -352,19 +579,22 @@ class GameViewModel : ViewModel() {
             }
         }
 
-        // Goal Check
         if (player.bounds.overlaps(door.bounds)) {
-            triggerLevelVictory()
-            return
+            if (door.isLocked) {
+                showBanner("🔒 DOOR IS LOCKED! FIND THE KEY!", Color(0xFFFF4757))
+            } else {
+                triggerLevelVictory()
+                return
+            }
         }
 
-        // Fall Off Screen
-        if (player.y > 340f) {
+        // --- FALL OFF SCREEN (TOP OR BOTTOM) ---
+        if (player.y > 360f || player.y < -100f) {
             triggerPlayerDeath()
             return
         }
 
-        // Smooth Camera Lerp
+        // --- SMOOTH CAMERA LERP ---
         val targetCamX = (player.x - 200f).coerceAtLeast(0f)
         val newCamX = state.cameraX + (targetCamX - state.cameraX) * 0.12f
 
@@ -373,9 +603,12 @@ class GameViewModel : ViewModel() {
                 player = player,
                 platforms = platforms,
                 spikes = spikes,
+                keys = keys,
+                checkpoints = checkpoints,
                 door = door,
                 cameraX = newCamX,
-                isControlsInverted = inverted
+                isControlsInverted = inverted,
+                isReverseGravity = isReverseGravity
             )
         }
     }
@@ -383,6 +616,8 @@ class GameViewModel : ViewModel() {
     private fun triggerPlayerDeath() {
         val state = _uiState.value
         if (state.isDead) return
+
+        if (state.isSoundEnabled) GameAudio.playDeathSound()
 
         val newDeaths = state.totalDeaths + 1
         val randomTaunt = LevelData.funnyTaunts.random()
@@ -419,6 +654,8 @@ class GameViewModel : ViewModel() {
 
     private fun triggerLevelVictory() {
         val state = _uiState.value
+        if (state.isSoundEnabled) GameAudio.playWinSound()
+
         val currId = state.currentLevel.id
         val nextId = currId + 1
 
