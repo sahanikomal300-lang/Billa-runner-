@@ -82,6 +82,9 @@ dependencies {
   implementation(platform(libs.androidx.compose.bom))
   implementation(platform(libs.firebase.bom))
 
+  // AdMob
+  implementation("com.google.android.gms:play-services-ads:24.5.0")
+
   implementation(libs.androidx.activity.compose)
   implementation(libs.androidx.compose.material.icons.core)
   implementation(libs.androidx.compose.material.icons.extended)
