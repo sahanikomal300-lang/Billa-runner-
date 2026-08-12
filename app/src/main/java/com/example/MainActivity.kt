@@ -25,6 +25,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+
 import com.example.game.engine.GameScreenState
 import com.example.game.engine.GameViewModel
 import com.example.game.ui.AchievementsScreen
@@ -38,9 +39,9 @@ import com.example.ui.theme.MyApplicationTheme
 
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.MobileAds
+import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.rewarded.RewardedAd
 import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback
-import com.google.android.gms.ads.LoadAdError
 
 class MainActivity : ComponentActivity() {
 
@@ -48,10 +49,9 @@ class MainActivity : ComponentActivity() {
 
     private var rewardedAd: RewardedAd? = null
 
-    // Google test Rewarded Ad Unit ID
-    // Testing complete hone ke baad ise apne AdMob ID se replace karna.
+    // Your AdMob Rewarded Ad Unit ID
     private val rewardedAdUnitId =
-        "ca-app-pub-3940256099942544/5224354917"
+        "ca-app-pub-286531151610110/9839338280"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -61,7 +61,7 @@ class MainActivity : ComponentActivity() {
         // Initialize AdMob
         MobileAds.initialize(this)
 
-        // Pre-load Rewarded Ad
+        // Load rewarded ad
         loadRewardedAd()
 
         setContent {
@@ -88,23 +88,29 @@ class MainActivity : ComponentActivity() {
                     rewardedAd = ad
                 }
 
-                override fun onAdFailedToLoad(error: LoadAdError) {
+                override fun onAdFailedToLoad(
+                    error: LoadAdError
+                ) {
                     rewardedAd = null
                 }
             }
         )
     }
 
-    fun showRewardedAd(onFinished: () -> Unit) {
+    fun showRewardedAd(
+        onFinished: () -> Unit
+    ) {
 
         val ad = rewardedAd
 
         if (ad == null) {
-            // Ad available nahi hai to game continue
+
+            // Agar ad ready nahi hai,
+            // game ko block nahi karenge.
             onFinished()
 
-            // Next ad load karo
             loadRewardedAd()
+
             return
         }
 
@@ -113,8 +119,9 @@ class MainActivity : ComponentActivity() {
             // Reward milne ke baad next level
             onFinished()
 
-            // Agla ad preload
             rewardedAd = null
+
+            // Next ad preload
             loadRewardedAd()
         }
     }
@@ -173,7 +180,7 @@ fun MainAppScreen(
         viewModel.initPreferences(context)
     }
 
-    // Death / Level complete vibration
+    // Vibration on death or level win
     LaunchedEffect(
         uiState.isDead,
         uiState.isLevelWon
@@ -258,7 +265,6 @@ fun MainAppScreen(
                         modifier = Modifier.fillMaxSize()
                     )
 
-
                     GameControlsOverlay(
 
                         uiState = uiState,
@@ -316,7 +322,6 @@ fun MainAppScreen(
                                 } else {
                                     GameScreenState.PAUSED
                                 }
-
                             )
                         }
                     )
@@ -381,12 +386,10 @@ fun MainAppScreen(
                                             22.sp
                                     )
 
-
                                     Spacer(
                                         modifier =
                                             Modifier.height(20.dp)
                                     )
-
 
                                     Button(
                                         onClick = {
@@ -428,12 +431,10 @@ fun MainAppScreen(
                                         )
                                     }
 
-
                                     Spacer(
                                         modifier =
                                             Modifier.height(10.dp)
                                     )
-
 
                                     OutlinedButton(
                                         onClick = {
@@ -471,6 +472,149 @@ fun MainAppScreen(
                                         )
                                     }
 
-
                                     Spacer(
-                                       
+                                        modifier =
+                                            Modifier.height(10.dp)
+                                    )
+
+                                    OutlinedButton(
+                                        onClick = {
+
+                                            viewModel.setScreen(
+                                                GameScreenState.MAIN_MENU
+                                            )
+                                        },
+
+                                        shape =
+                                            RoundedCornerShape(12.dp),
+
+                                        modifier =
+                                            Modifier.fillMaxWidth()
+                                    ) {
+
+                                        Text(
+                                            "MAIN MENU",
+                                            color =
+                                                Color(0xFFA4B0BE),
+
+                                            fontWeight =
+                                                FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Keyboard focus
+                    LaunchedEffect(Unit) {
+
+                        try {
+                            focusRequester.requestFocus()
+                        } catch (_: Exception) {
+                        }
+                    }
+                }
+
+
+                // =========================
+                // LEVEL SELECT
+                // =========================
+
+                GameScreenState.LEVEL_SELECT -> {
+
+                    LevelSelectScreen(
+
+                        uiState = uiState,
+
+                        onSelectLevel = { levelIdx ->
+
+                            viewModel.loadLevel(levelIdx)
+
+                            viewModel.setScreen(
+                                GameScreenState.PLAYING
+                            )
+                        },
+
+                        onBackToMenu = {
+
+                            viewModel.setScreen(
+                                GameScreenState.MAIN_MENU
+                            )
+                        }
+                    )
+                }
+
+
+                // =========================
+                // SETTINGS
+                // =========================
+
+                GameScreenState.SETTINGS -> {
+
+                    SettingsScreen(
+
+                        uiState = uiState,
+
+                        onToggleSound = {
+                            viewModel.toggleSound()
+                        },
+
+                        onToggleMusic = {
+                            viewModel.toggleMusic()
+                        },
+
+                        onClearData = {
+                            viewModel.clearAllProgress(context)
+                        },
+
+                        onBackToMenu = {
+
+                            viewModel.setScreen(
+                                GameScreenState.MAIN_MENU
+                            )
+                        }
+                    )
+                }
+
+
+                // =========================
+                // ACHIEVEMENTS
+                // =========================
+
+                GameScreenState.ACHIEVEMENTS -> {
+
+                    AchievementsScreen(
+
+                        uiState = uiState,
+
+                        onBackToMenu = {
+
+                            viewModel.setScreen(
+                                GameScreenState.MAIN_MENU
+                            )
+                        }
+                    )
+                }
+
+
+                // =========================
+                // HTML CODE
+                // =========================
+
+                GameScreenState.HTML_CODE_VIEW -> {
+
+                    HtmlCodeScreen(
+
+                        onBack = {
+
+                            viewModel.setScreen(
+                                GameScreenState.MAIN_MENU
+                            )
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
