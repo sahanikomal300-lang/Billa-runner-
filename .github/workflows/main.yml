@@ -20,6 +20,11 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Setup Gradle 9.3.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.3.1'
+
       - name: Create Debug Keystore
         run: |
           keytool -genkeypair \
@@ -32,29 +37,22 @@ jobs:
             -keypass android \
             -dname "CN=Android Debug,O=Android,C=US"
 
-      - name: Find Gradle Project
+      - name: Check Project
         run: |
-          echo "Searching for gradlew..."
-          find . -name gradlew -type f -print
+          echo "📁 Project files:"
+          ls -la
+          echo "📁 App folder:"
+          ls -la app
 
       - name: Build Debug APK
         run: |
-          GRADLEW=$(find . -name gradlew -type f | head -n 1)
+          gradle assembleDebug --stacktrace --info
 
-          if [ -z "$GRADLEW" ]; then
-            echo "❌ gradlew file nahi mili!"
-            echo "Repository structure:"
-            find . -maxdepth 3 -type f | head -100
-            exit 1
-          fi
-
-          echo "✅ Found Gradle: $GRADLEW"
-
-          PROJECT_DIR=$(dirname "$GRADLEW")
-          cd "$PROJECT_DIR"
-
-          chmod +x gradlew
-          ./gradlew assembleDebug --stacktrace --info
+      - name: Show APK
+        if: always()
+        run: |
+          echo "📦 Searching APK..."
+          find . -type f -name "*.apk" -print
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
@@ -66,6 +64,7 @@ jobs:
       - name: Build Summary
         if: always()
         run: |
-          echo "## 📦 Build Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "## 📦 Billa Runner APK Build" >> "$GITHUB_STEP_SUMMARY"
           echo "- **Status:** ${{ job.status }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- **APK:** Debug APK" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Gradle:** 9.3.1" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **JDK:** 17" >> "$GITHUB_STEP_SUMMARY"
