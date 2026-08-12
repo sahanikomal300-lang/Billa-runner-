@@ -21,7 +21,49 @@ enum class TrapType {
     GRAVITY_NORMAL,        // Normal gravity
     MOVING_PLATFORM,       // Platform slides back and forth
     BREAKABLE_WALL,        // Giant player can break this wall
-    SINKING_FLOOR          // Platform sinks into the abyss when stepped on
+    SINKING_FLOOR,         // Platform sinks into the abyss when stepped on
+    SLIPPERY_ICE,          // Low friction slippery platform
+    SPRING_PAD             // Launches player high into the air
+}
+
+data class Teleporter(
+    val id: Int,
+    val x: Float,
+    val y: Float,
+    val targetX: Float,
+    val targetY: Float,
+    val width: Float = 28f,
+    val height: Float = 36f,
+    val color: Color = Color(0xFF00D2D3),
+    var cooldown: Int = 0
+) {
+    val bounds: Rect
+        get() = Rect(x, y, x + width, y + height)
+}
+
+data class SpringPad(
+    val id: Int,
+    val x: Float,
+    val y: Float,
+    val width: Float = 32f,
+    val height: Float = 14f,
+    val launchPower: Float = -21.5f,
+    var compressionAnim: Float = 0f
+) {
+    val bounds: Rect
+        get() = Rect(x, y, x + width, y + height)
+}
+
+data class CollectibleStar(
+    val id: Int,
+    val x: Float,
+    val y: Float,
+    val width: Float = 20f,
+    val height: Float = 20f,
+    var isCollected: Boolean = false
+) {
+    val bounds: Rect
+        get() = Rect(x, y, x + width, y + height)
 }
 
 data class LevelKey(
@@ -162,10 +204,23 @@ data class Level(
     val spikes: List<Spike>,
     val door: Door,
     val keys: List<LevelKey> = emptyList(),
+    val teleporters: List<Teleporter> = emptyList(),
+    val springs: List<SpringPad> = emptyList(),
+    val stars: List<CollectibleStar> = emptyList(),
     val checkpoints: List<Checkpoint> = emptyList(),
     val triggerZones: List<TriggerZone> = emptyList(),
     val worldWidth: Float = 1200f,
-    val hint: String = ""
+    val hint: String = "",
+    val parTimeMs: Long = 15000L,
+    val difficultyRating: String = "Easy" // Easy, Normal, Hard, Insane, Extreme
+)
+
+data class Achievement(
+    val id: String,
+    val title: String,
+    val description: String,
+    val icon: String,
+    var isUnlocked: Boolean = false
 )
 
 data class GameStats(

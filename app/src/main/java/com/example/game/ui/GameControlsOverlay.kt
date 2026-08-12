@@ -22,6 +22,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -54,6 +56,7 @@ fun GameControlsOverlay(
     onNextLevel: () -> Unit,
     onOpenLevelSelect: () -> Unit,
     onOpenHtmlCode: () -> Unit,
+    onTogglePause: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
@@ -70,10 +73,7 @@ fun GameControlsOverlay(
                     verticalArrangement = Arrangement.Center,
                     modifier = Modifier.padding(24.dp)
                 ) {
-                    Text(
-                        text = "📱",
-                        fontSize = 64.sp
-                    )
+                    Text(text = "📱", fontSize = 64.sp)
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
                         text = "ROTATE YOUR PHONE",
@@ -84,7 +84,7 @@ fun GameControlsOverlay(
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "Level Devil is designed for landscape mode. Please turn your device sideways!",
+                        text = "Level Devil is designed for landscape mode. Turn device sideways for precision platforming!",
                         color = Color(0xFFA4B0BE),
                         fontSize = 14.sp,
                         textAlign = TextAlign.Center
@@ -92,7 +92,7 @@ fun GameControlsOverlay(
                 }
             }
         } else {
-            // Landscape Game Controls UI
+            // Landscape Game UI Overlay
             Box(modifier = Modifier.fillMaxSize()) {
 
                 // --- TOP HUD BAR ---
@@ -103,49 +103,65 @@ fun GameControlsOverlay(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Level Title Pill
-                    Surface(
-                        color = Color(0xFF1E1B2E).copy(alpha = 0.8f),
-                        shape = RoundedCornerShape(10.dp)
-                    ) {
+                    // Level Name & Subtitle
+                    Column {
                         Text(
                             text = uiState.currentLevel.name,
                             color = Color.White,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
+                            fontWeight = FontWeight.Black,
+                            fontSize = 18.sp
+                        )
+                        Text(
+                            text = uiState.currentLevel.subtitle,
+                            color = Color(0xFFFFD700),
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 12.sp
                         )
                     }
 
-                    // Inverted Controls Indicator
-                    if (uiState.isControlsInverted) {
-                        Surface(
-                            color = Color(0xFFFF4757),
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            Text(
-                                text = "⚠️ CONTROLS FLIPPED!",
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 11.sp,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                            )
-                        }
-                    }
-
-                    // Death Count & Actions
+                    // Stats: Timer, Stars & Death Counter
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Surface(
-                            color = Color(0xFFFF4757).copy(alpha = 0.85f),
-                            shape = RoundedCornerShape(8.dp)
+                            color = Color(0xFF1E1E30).copy(alpha = 0.85f),
+                            shape = RoundedCornerShape(12.dp)
                         ) {
-                            Text(
-                                text = "FAILS: ${uiState.totalDeaths}",
-                                color = Color.White,
-                                fontWeight = FontWeight.ExtraBold,
-                                fontSize = 12.sp,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
-                            )
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "⏱️ ${formatTime(uiState.elapsedTimeMs)}",
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(
+                                    text = "⭐ ${uiState.collectedStarsInLevel}/${uiState.currentLevel.stars.size}",
+                                    color = Color(0xFFFFD700),
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(
+                                    text = "💀 ${uiState.totalDeaths}",
+                                    color = Color(0xFFFF4757),
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.width(10.dp))
+
+                        IconButton(
+                            onClick = onTogglePause,
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF2F3542))
+                        ) {
+                            Icon(Icons.Default.Pause, contentDescription = "Pause", tint = Color.White)
                         }
 
                         Spacer(modifier = Modifier.width(6.dp))
@@ -153,16 +169,12 @@ fun GameControlsOverlay(
                         IconButton(
                             onClick = onRestartLevel,
                             modifier = Modifier
-                                .testTag("btn_restart_hud")
-                                .size(32.dp)
-                                .background(Color(0xFF2F3542).copy(alpha = 0.75f), CircleShape)
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF2F3542))
+                                .testTag("restart_button")
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Refresh,
-                                contentDescription = "Restart Level",
-                                tint = Color.White,
-                                modifier = Modifier.size(18.dp)
-                            )
+                            Icon(Icons.Default.Refresh, contentDescription = "Restart Level", tint = Color.White)
                         }
 
                         Spacer(modifier = Modifier.width(6.dp))
@@ -170,266 +182,244 @@ fun GameControlsOverlay(
                         IconButton(
                             onClick = onOpenLevelSelect,
                             modifier = Modifier
-                                .testTag("btn_level_select_hud")
-                                .size(32.dp)
-                                .background(Color(0xFF2F3542).copy(alpha = 0.75f), CircleShape)
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF2F3542))
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.GridView,
-                                contentDescription = "Level Select",
-                                tint = Color.White,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.width(6.dp))
-
-                        IconButton(
-                            onClick = onOpenHtmlCode,
-                            modifier = Modifier
-                                .testTag("btn_html_code_hud")
-                                .size(32.dp)
-                                .background(Color(0xFFFFA502).copy(alpha = 0.85f), CircleShape)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Code,
-                                contentDescription = "View HTML Code",
-                                tint = Color(0xFF1E1B2E),
-                                modifier = Modifier.size(18.dp)
-                            )
+                            Icon(Icons.Default.GridView, contentDescription = "Level Select", tint = Color.White)
                         }
                     }
                 }
 
-                // --- BOTTOM TOUCH CONTROLS ---
-                if (!uiState.isDead && !uiState.isLevelWon) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .align(Alignment.BottomCenter)
-                            .padding(horizontal = 24.dp, vertical = 12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Left & Right D-Pad
-                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            // LEFT BUTTON
-                            ControlButton(
-                                testTag = "btn_touch_left",
-                                size = 56,
-                                onPressChange = onLeftPressedChange
-                            ) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = "Left",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(26.dp)
-                                )
-                            }
-
-                            // RIGHT BUTTON
-                            ControlButton(
-                                testTag = "btn_touch_right",
-                                size = 56,
-                                onPressChange = onRightPressedChange
-                            ) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                                    contentDescription = "Right",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(26.dp)
-                                )
-                            }
-                        }
-
-                        // JUMP BUTTON
-                        ControlButton(
-                            testTag = "btn_touch_jump",
-                            size = 64,
-                            backgroundColor = Color(0xFFFF4757).copy(alpha = 0.75f),
-                            onPressChange = onJumpPressedChange
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Icon(
-                                    imageVector = Icons.Default.ArrowUpward,
-                                    contentDescription = "Jump",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                                Text(
-                                    text = "JUMP",
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 10.sp
-                                )
-                            }
-                        }
-                    }
-                }
-
-                // --- DEATH OVERLAY SCREEN ---
-                if (uiState.isDead) {
+                // --- BANNER NOTIFICATION ---
+                if (uiState.bannerAlpha > 0f) {
                     Box(
                         modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color(0xCC0F0F1B)),
-                        contentAlignment = Alignment.Center
+                            .align(Alignment.TopCenter)
+                            .padding(top = 50.dp)
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(uiState.bannerColor.copy(alpha = 0.95f))
+                            .padding(horizontal = 20.dp, vertical = 8.dp)
                     ) {
-                        Card(
-                            shape = RoundedCornerShape(20.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1B2E)),
-                            modifier = Modifier
-                                .padding(20.dp)
-                                .fillMaxWidth(0.7f)
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(18.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Text(
-                                    text = "You Failed! 😂",
-                                    color = Color(0xFFFF4757),
-                                    fontWeight = FontWeight.Black,
-                                    fontSize = 24.sp
-                                )
-
-                                Spacer(modifier = Modifier.height(4.dp))
-
-                                Text(
-                                    text = uiState.tauntMessage,
-                                    color = Color(0xFFA4B0BE),
-                                    fontSize = 14.sp,
-                                    textAlign = TextAlign.Center
-                                )
-
-                                Spacer(modifier = Modifier.height(14.dp))
-
-                                Button(
-                                    onClick = onRestartLevel,
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF4757)),
-                                    shape = RoundedCornerShape(10.dp),
-                                    modifier = Modifier
-                                        .testTag("btn_try_again")
-                                        .fillMaxWidth()
-                                        .height(44.dp)
-                                ) {
-                                    Text(
-                                        text = "TRY AGAIN",
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 14.sp,
-                                        color = Color.White
-                                    )
-                                }
-
-                                Spacer(modifier = Modifier.height(6.dp))
-
-                                Button(
-                                    onClick = onOpenLevelSelect,
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2F3542)),
-                                    shape = RoundedCornerShape(10.dp),
-                                    modifier = Modifier
-                                        .testTag("btn_select_level_death")
-                                        .fillMaxWidth()
-                                        .height(40.dp)
-                                ) {
-                                    Text(
-                                        text = "SELECT LEVEL",
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = Color.White
-                                    )
-                                }
-                            }
-                        }
+                        Text(
+                            text = uiState.bannerText,
+                            color = Color.Black,
+                            fontWeight = FontWeight.Black,
+                            fontSize = 15.sp
+                        )
                     }
                 }
 
-                // --- LEVEL WIN OVERLAY SCREEN ---
+                // --- TOUCH CONTROLS OVERLAY ---
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.BottomCenter)
+                        .padding(horizontal = 24.dp, vertical = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Bottom
+                ) {
+                    // Left / Right DPAD
+                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        TouchButton(
+                            label = "LEFT",
+                            icon = Icons.AutoMirrored.Filled.ArrowBack,
+                            isPressed = false,
+                            onPressedChange = onLeftPressedChange,
+                            testTag = "btn_left"
+                        )
+                        TouchButton(
+                            label = "RIGHT",
+                            icon = Icons.AutoMirrored.Filled.ArrowForward,
+                            isPressed = false,
+                            onPressedChange = onRightPressedChange,
+                            testTag = "btn_right"
+                        )
+                    }
+
+                    // Jump Button
+                    TouchButton(
+                        label = "JUMP",
+                        icon = Icons.Default.ArrowUpward,
+                        isPressed = false,
+                        onPressedChange = onJumpPressedChange,
+                        sizeDp = 76,
+                        buttonColor = Color(0xFF2ED573),
+                        testTag = "btn_jump"
+                    )
+                }
+
+                // --- VICTORY MODAL ---
                 if (uiState.isLevelWon) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(Color(0xEE0F0F1B)),
+                            .background(Color.Black.copy(alpha = 0.82f)),
                         contentAlignment = Alignment.Center
                     ) {
                         Card(
-                            shape = RoundedCornerShape(20.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1B2E)),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E30)),
+                            shape = RoundedCornerShape(24.dp),
                             modifier = Modifier
-                                .padding(20.dp)
-                                .fillMaxWidth(0.7f)
+                                .width(380.dp)
+                                .padding(16.dp)
                         ) {
                             Column(
-                                modifier = Modifier.padding(18.dp),
+                                modifier = Modifier.padding(24.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
                                 Text(
-                                    text = "LEVEL CLEARED! 🎉",
+                                    text = "LEVEL BEATEN! 🎉",
                                     color = Color(0xFF2ED573),
                                     fontWeight = FontWeight.Black,
                                     fontSize = 24.sp
                                 )
 
-                                Spacer(modifier = Modifier.height(4.dp))
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                // Stars Earned Display
+                                Row {
+                                    for (i in 1..3) {
+                                        Text(
+                                            text = if (i <= uiState.earnedStars) "⭐" else "🔒",
+                                            fontSize = 32.sp,
+                                            modifier = Modifier.padding(horizontal = 4.dp)
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(12.dp))
 
                                 Text(
-                                    text = "You beat the Devil's trap!",
+                                    text = "Time: ${formatTime(uiState.elapsedTimeMs)} (Par: ${formatTime(uiState.currentLevel.parTimeMs)})",
                                     color = Color.White,
-                                    fontSize = 13.sp
+                                    fontSize = 14.sp
                                 )
 
-                                Spacer(modifier = Modifier.height(14.dp))
+                                Spacer(modifier = Modifier.height(20.dp))
 
-                                Button(
-                                    onClick = onNextLevel,
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2ED573)),
-                                    shape = RoundedCornerShape(10.dp),
-                                    modifier = Modifier
-                                        .testTag("btn_next_level")
-                                        .fillMaxWidth()
-                                        .height(44.dp)
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    Text(
-                                        text = "NEXT LEVEL →",
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 14.sp,
-                                        color = Color(0xFF1E1B2E)
-                                    )
+                                    Button(
+                                        onClick = onOpenLevelSelect,
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2F3542)),
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Text("Levels")
+                                    }
+
+                                    Button(
+                                        onClick = onNextLevel,
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2ED573)),
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Text("Next Level ➔", color = Color.Black, fontWeight = FontWeight.Bold)
+                                    }
                                 }
                             }
                         }
                     }
                 }
 
+                // --- GAME OVER MODAL ---
+                if (uiState.isDead) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.78f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E30)),
+                            shape = RoundedCornerShape(24.dp),
+                            modifier = Modifier
+                                .width(360.dp)
+                                .padding(16.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(24.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = "YOU DIED! 💀",
+                                    color = Color(0xFFFF4757),
+                                    fontWeight = FontWeight.Black,
+                                    fontSize = 26.sp
+                                )
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                Text(
+                                    text = uiState.tauntMessage,
+                                    color = Color(0xFFFFA502),
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 15.sp,
+                                    textAlign = TextAlign.Center
+                                )
+
+                                Spacer(modifier = Modifier.height(20.dp))
+
+                                Button(
+                                    onClick = onRestartLevel,
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF4757)),
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .testTag("respawn_button")
+                                ) {
+                                    Text("TRY AGAIN 🔄", color = Color.White, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun ControlButton(
-    testTag: String,
-    size: Int = 56,
-    backgroundColor: Color = Color(0xFF2F3542).copy(alpha = 0.65f),
-    onPressChange: (Boolean) -> Unit,
-    content: @Composable () -> Unit
+private fun TouchButton(
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    isPressed: Boolean,
+    onPressedChange: (Boolean) -> Unit,
+    sizeDp: Int = 64,
+    buttonColor: Color = Color(0xFF3742FA),
+    testTag: String
 ) {
     Box(
         modifier = Modifier
-            .testTag(testTag)
-            .size(size.dp)
+            .size(sizeDp.dp)
             .clip(CircleShape)
-            .background(backgroundColor)
+            .background(buttonColor.copy(alpha = 0.85f))
+            .testTag(testTag)
             .pointerInput(Unit) {
                 detectTapGestures(
                     onPress = {
-                        onPressChange(true)
+                        onPressedChange(true)
                         tryAwaitRelease()
-                        onPressChange(false)
+                        onPressedChange(false)
                     }
                 )
             },
         contentAlignment = Alignment.Center
     ) {
-        content()
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = Color.White,
+            modifier = Modifier.size((sizeDp * 0.5f).dp)
+        )
     }
+}
+
+private fun formatTime(ms: Long): String {
+    val totalSeconds = ms / 1000
+    val minutes = totalSeconds / 60
+    val seconds = totalSeconds % 60
+    val millis = (ms % 1000) / 100
+    return String.format("%02d:%02d.%d", minutes, seconds, millis)
 }

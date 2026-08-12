@@ -1,7 +1,6 @@
 package com.example.game.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,14 +13,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -32,18 +29,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.game.data.LevelData
 import com.example.game.engine.GameUiState
 
 @Composable
-fun LevelSelectScreen(
+fun AchievementsScreen(
     uiState: GameUiState,
-    onSelectLevel: (Int) -> Unit,
     onBackToMenu: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -79,70 +73,64 @@ fun LevelSelectScreen(
                 Spacer(modifier = Modifier.width(12.dp))
 
                 Text(
-                    text = "SELECT LEVEL 🎮",
+                    text = "ACHIEVEMENTS 🏆 (${uiState.unlockedAchievements.size}/10)",
                     color = Color.White,
                     fontWeight = FontWeight.Black,
-                    fontSize = 22.sp
+                    fontSize = 20.sp
                 )
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Level Grid
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(5),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(10.dp),
                 contentPadding = PaddingValues(bottom = 16.dp)
             ) {
-                itemsIndexed(LevelData.levels) { idx, level ->
-                    val progress = uiState.levelProgressMap[level.id]
-                    val isUnlocked = progress?.isUnlocked ?: (idx == 0)
-                    val stars = progress?.stars ?: 0
+                items(LevelData.achievements) { ach ->
+                    val isUnlocked = uiState.unlockedAchievements.contains(ach.id)
 
                     Card(
                         colors = CardDefaults.cardColors(
                             containerColor = if (isUnlocked) Color(0xFF1E1E30) else Color(0xFF141420)
                         ),
                         shape = RoundedCornerShape(16.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(72.dp)
-                            .testTag("level_item_$idx")
-                            .clickable(enabled = isUnlocked) { onSelectLevel(idx) }
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            if (isUnlocked) {
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.Center
-                                ) {
-                                    Text(
-                                        text = "${level.id}",
-                                        color = Color.White,
-                                        fontWeight = FontWeight.Black,
-                                        fontSize = 18.sp
-                                    )
-                                    Row {
-                                        for (s in 1..3) {
-                                            Text(
-                                                text = if (s <= stars) "⭐" else "・",
-                                                fontSize = 10.sp
-                                            )
-                                        }
-                                    }
-                                }
-                            } else {
-                                Icon(
-                                    imageVector = Icons.Default.Lock,
-                                    contentDescription = "Locked",
-                                    tint = Color(0xFF57606F),
-                                    modifier = Modifier.size(22.dp)
+                            Text(
+                                text = ach.icon,
+                                fontSize = 32.sp
+                            )
+
+                            Spacer(modifier = Modifier.width(16.dp))
+
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = ach.title,
+                                    color = if (isUnlocked) Color(0xFFFFD700) else Color(0xFFA4B0BE),
+                                    fontWeight = FontWeight.Black,
+                                    fontSize = 16.sp
+                                )
+                                Text(
+                                    text = ach.description,
+                                    color = Color(0xFF747D8C),
+                                    fontSize = 13.sp
                                 )
                             }
+
+                            Spacer(modifier = Modifier.width(8.dp))
+
+                            Text(
+                                text = if (isUnlocked) "UNLOCKED ✅" else "LOCKED 🔒",
+                                color = if (isUnlocked) Color(0xFF2ED573) else Color(0xFF57606F),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp
+                            )
                         }
                     }
                 }

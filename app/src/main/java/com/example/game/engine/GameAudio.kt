@@ -30,6 +30,30 @@ object GameAudio {
         }
     }
 
+    fun playStarSound() {
+        scope.launch {
+            generateTwoNoteChime(freq1 = 783.99f, freq2 = 1174.66f, durationPerNoteMs = 60)
+        }
+    }
+
+    fun playTeleportSound() {
+        scope.launch {
+            generateToneSweep(startFreq = 800f, endFreq = 1600f, durationMs = 110)
+        }
+    }
+
+    fun playSpringSound() {
+        scope.launch {
+            generateToneSweep(startFreq = 200f, endFreq = 900f, durationMs = 140)
+        }
+    }
+
+    fun playWallBreakSound() {
+        scope.launch {
+            generateToneSweep(startFreq = 250f, endFreq = 60f, durationMs = 150)
+        }
+    }
+
     fun playCheckpointSound() {
         scope.launch {
             generateTwoNoteChime(freq1 = 523.25f, freq2 = 659.25f, durationPerNoteMs = 80)
@@ -39,6 +63,12 @@ object GameAudio {
     fun playWinSound() {
         scope.launch {
             generateTwoNoteChime(freq1 = 659.25f, freq2 = 1046.50f, durationPerNoteMs = 120)
+        }
+    }
+
+    fun playButtonClick() {
+        scope.launch {
+            generateToneSweep(startFreq = 400f, endFreq = 500f, durationMs = 35)
         }
     }
 
@@ -105,7 +135,7 @@ object GameAudio {
 
         // Release resources after tone finishes
         scope.launch {
-            kotlinx.coroutines.delay(300)
+            kotlinx.coroutines.delay(350)
             try {
                 audioTrack.stop()
                 audioTrack.release()
