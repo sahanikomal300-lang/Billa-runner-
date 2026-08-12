@@ -32,14 +32,40 @@ jobs:
             -keypass android \
             -dname "CN=Android Debug,O=Android,C=US"
 
-      - name: Make Gradle executable
-        run: chmod +x gradlew
+      - name: Find Gradle Project
+        run: |
+          echo "Searching for gradlew..."
+          find . -name gradlew -type f -print
 
       - name: Build Debug APK
-        run: ./gradlew assembleDebug
+        run: |
+          GRADLEW=$(find . -name gradlew -type f | head -n 1)
+
+          if [ -z "$GRADLEW" ]; then
+            echo "❌ gradlew file nahi mili!"
+            echo "Repository structure:"
+            find . -maxdepth 3 -type f | head -100
+            exit 1
+          fi
+
+          echo "✅ Found Gradle: $GRADLEW"
+
+          PROJECT_DIR=$(dirname "$GRADLEW")
+          cd "$PROJECT_DIR"
+
+          chmod +x gradlew
+          ./gradlew assembleDebug --stacktrace --info
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Billa-runner-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          path: '**/build/outputs/apk/debug/*.apk'
+          if-no-files-found: error
+
+      - name: Build Summary
+        if: always()
+        run: |
+          echo "## 📦 Build Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Status:** ${{ job.status }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **APK:** Debug APK" >> "$GITHUB_STEP_SUMMARY"
